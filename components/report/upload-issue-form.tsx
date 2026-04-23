@@ -71,6 +71,7 @@ export function UploadIssueForm() {
 
   return (
     <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+      
       <form
         onSubmit={onSubmit}
         className="animate-rise-in rounded-2xl border border-[#d8e0e7] bg-white p-5 shadow-[0_12px_24px_rgba(38,59,84,0.08)] md:p-6"
