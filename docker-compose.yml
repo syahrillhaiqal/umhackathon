@@ -1,0 +1,68 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gridguard
+      POSTGRES_PASSWORD: gridguard
+      POSTGRES_DB: gridguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gridguard -d gridguard"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      APP_NAME: GridGuard API
+      APP_ENV: docker
+      GRIDGUARD_DEBUG: "false"
+      GLM_API_KEY: ${GLM_API_KEY:-}
+      GLM_BASE_URL: ${GLM_BASE_URL:-https://open.bigmodel.cn/api/paas/v4/}
+      GLM_MODEL: ${GLM_MODEL:-glm-5.1}
+      DUCKDB_PATH: /app/data/gridguard.duckdb
+      POSTGRES_DSN: postgresql+asyncpg://gridguard:gridguard@postgres:5432/gridguard
+      REDIS_URL: redis://redis:6379/0
+      FUND_TRANSFER_INCREMENT: "20000"
+      CONTINGENCY_FUND_SOURCE: Safety_Contingency
+      CONTRACTOR_RETRY_LIMIT: "5"
+    volumes:
+      - duckdb_data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    depends_on:
+      - backend
+    ports:
+      - "5174:8080"
+
+volumes:
+  pgdata:
+  duckdb_data:
