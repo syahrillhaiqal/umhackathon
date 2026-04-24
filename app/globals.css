@@ -1,15 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --bg-canvas: #f3f5f7;
-  --bg-paper: #ffffff;
-  --text-strong: #12212e;
-  --text-soft: #526478;
-  --line: #d7e0e8;
-  --brand: #0d8f8f;
-  --brand-deep: #0e6e74;
-  --alert: #ee6c4d;
-  --ok: #3f8f5f;
+  --bg-canvas: #0d1624;
+  --bg-panel: #142338;
+  --bg-panel-soft: #1a2c45;
+  --text-strong: #e6eef9;
+  --text-soft: #9cb1cc;
+  --line: #314766;
+  --brand: #5a76a3;
+  --brand-deep: #405f86;
+  --alert: #e28e72;
+  --ok: #5ea88b;
 }
 
 @theme inline {
@@ -21,9 +22,9 @@
 
 body {
   background-color: var(--bg-canvas);
-  background: radial-gradient(circle at 10% 5%, #dbf8f0 0, transparent 34%),
-    radial-gradient(circle at 85% 12%, #ffe4d6 0, transparent 35%),
-    linear-gradient(180deg, #f6f8fa 0%, #eef2f6 100%);
+  background: radial-gradient(circle at 10% 5%, #1b304b 0, transparent 30%),
+    radial-gradient(circle at 88% 12%, #1c2a3d 0, transparent 36%),
+    linear-gradient(180deg, #0d1726 0%, #111d2f 100%);
   color: var(--text-strong);
   font-family: var(--font-body), "Segoe UI", sans-serif;
 }
@@ -32,7 +33,7 @@ h1,
 h2,
 h3,
 h4 {
-  font-family: var(--font-heading), "Georgia", serif;
+  font-family: var(--font-heading), "Segoe UI", sans-serif;
 }
 
 @keyframes riseIn {

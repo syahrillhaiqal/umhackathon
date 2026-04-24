@@ -1,21 +1,21 @@
 import type { Metadata } from "next";
-import { Fraunces, Space_Grotesk } from "next/font/google";
+import { IBM_Plex_Sans, Public_Sans } from "next/font/google";
 import "./globals.css";
 
-const headingFont = Fraunces({
+const headingFont = Public_Sans({
   variable: "--font-heading",
   subsets: ["latin"],
 });
 
-const bodyFont = Space_Grotesk({
+const bodyFont = IBM_Plex_Sans({
   variable: "--font-body",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Civic Traffic Risk Intake",
+  title: "GridGuard",
   description:
-    "Upload and triage traffic hazards for faster verification by PBT, Majlis Daerah, and JKR teams.",
+    "GridGuard helps PBT, Majlis Daerah, and JKR verify AI-assisted traffic incident urgency and budget decisions.",
 };
 
 export default function RootLayout({

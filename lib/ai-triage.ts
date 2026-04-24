@@ -8,6 +8,8 @@ export interface TriageInput {
   location: string;
   description: string;
   imageSize: number;
+  latitude: number;
+  longitude: number;
 }
 
 export interface TriageResult {
@@ -16,6 +18,7 @@ export interface TriageResult {
   hazardType: HazardType;
   confidence: number;
   recommendation: string;
+  aiSuggestedBudget: number;
 }
 
 function normalizeScore(seedText: string): number {
@@ -30,7 +33,7 @@ function normalizeScore(seedText: string): number {
 }
 
 export function generateDummyTriage(input: TriageInput): TriageResult {
-  const combinedSignal = `${input.location}|${input.description}|${input.imageSize}`.toLowerCase();
+  const combinedSignal = `${input.location}|${input.description}|${input.imageSize}|${input.latitude}|${input.longitude}`.toLowerCase();
   const score = normalizeScore(combinedSignal);
   const highSignalWords = /(tree|fallen|blocked|accident|injury|fire|landslide|flood|sinkhole)/;
   const mediumSignalWords = /(pothole|hole|debris|jam|congestion|damaged sign|light)/;
@@ -46,6 +49,7 @@ export function generateDummyTriage(input: TriageInput): TriageResult {
       confidence: 82 + (score % 14),
       recommendation:
         "Dispatch rapid response team and request immediate manual verification from district operations.",
+      aiSuggestedBudget: 22000 + (score % 8) * 2000,
     };
   }
 
@@ -57,6 +61,7 @@ export function generateDummyTriage(input: TriageInput): TriageResult {
       confidence: 71 + (score % 15),
       recommendation:
         "Queue municipal maintenance crew and monitor nearby traffic flow for escalation signs.",
+      aiSuggestedBudget: 9000 + (score % 6) * 1200,
     };
   }
 
@@ -67,5 +72,6 @@ export function generateDummyTriage(input: TriageInput): TriageResult {
     confidence: 65 + (score % 18),
     recommendation:
       "Keep in monitoring list and schedule normal inspection if no further citizen reports are received.",
+    aiSuggestedBudget: 3500 + (score % 5) * 700,
   };
 }
