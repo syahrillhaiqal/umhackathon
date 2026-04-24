@@ -214,13 +214,14 @@ class WorkflowNodes:
     async def _record_event(self, state: WorkflowGraphState, node: str, summary: str, decision: str | None) -> None:
         payload = self._serialize_state(state)
         incident_id = state["incident"].incident_id
-        await self._audit_repo.record(
-            incident_id=incident_id,
-            node_name=node,
-            summary=summary,
-            decision=decision,
-            payload=payload,
-        )
+        if self._audit_repo is not None:
+            await self._audit_repo.record(
+                incident_id=incident_id,
+                node_name=node,
+                summary=summary,
+                decision=decision,
+                payload=payload,
+            )
         await self._event_broker.publish(
             {
                 "incident_id": incident_id,

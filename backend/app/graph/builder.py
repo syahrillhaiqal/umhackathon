@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from langgraph.checkpoint.redis import RedisSaver
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from app.core.enums import ReasoningDecisionType, ResolutionStatus

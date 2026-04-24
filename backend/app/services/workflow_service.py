@@ -26,7 +26,14 @@ class WorkflowService:
 
     async def initialize(self) -> None:
         self._budget_repo.initialize()
-        await self._audit_repo.initialize()
+        try:
+            await self._audit_repo.initialize()
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Postgres unavailable — audit logging disabled. (%s)", exc
+            )
+            self._audit_repo = None
         nodes = WorkflowNodes(
             settings=settings,
             budget_repo=self._budget_repo,
@@ -60,9 +67,13 @@ class WorkflowService:
         return self._normalize(final_state)
 
     async def list_incidents(self) -> list[dict[str, Any]]:
+        if self._audit_repo is None:
+            return []
         return await self._audit_repo.list_latest_incidents()
 
     async def get_trace(self, incident_id: str) -> list[dict[str, Any]]:
+        if self._audit_repo is None:
+            return []
         return await self._audit_repo.list_incident_trace(incident_id)
 
     async def list_budgets(self) -> list[dict[str, float | str]]:

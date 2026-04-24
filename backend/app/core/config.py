@@ -1,8 +1,6 @@
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -30,9 +28,9 @@ class Settings(BaseSettings):
             return True
         return True
 
-    glm_api_key: str = Field(default="", alias="GLM_API_KEY")
+    glm_api_key: str = Field(default="sk-2ba4832dd2d2eb6fde8e1a4b7fb41bdeaed1191734da033a", alias="GLM_API_KEY")
     glm_base_url: str = Field(default="https://open.bigmodel.cn/api/paas/v4/", alias="GLM_BASE_URL")
-    glm_model: str = Field(default="glm-5.1", alias="GLM_MODEL")
+    glm_model: str = Field(default="glm-4.6", alias="GLM_MODEL")
 
     duckdb_path: str = Field(default="./data/gridguard.duckdb", alias="DUCKDB_PATH")
     postgres_dsn: str = Field(
