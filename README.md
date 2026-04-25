@@ -23,7 +23,7 @@ Enable these APIs in Google Cloud for the key:
 - Geolocation API (browser-side location permission still required)
 
 ## PRESENTATION LINK
-https://drive.google.com/file/d/1lY43vafSkuWUtsAITNqnnuCyZCS5Fp8F/view?usp=sharing
+https://drive.google.com/file/d/1GJZiE5cfnyP4mRGYpbn6iHNwvvqrp0Ey/view?usp=sharing
 
 ## Run Backend Locally 
 Activate venv (if you have .venv there)
