@@ -1,30 +1,37 @@
-# Civic Traffic Risk Intake
+# GridGuard
 
-This project is a Next.js application for collecting and triaging public traffic issue reports. It is designed to support verification workflows for agencies such as PBT, Majlis Daerah, and JKR.
+GridGuard is a Next.js system for AI-assisted traffic incident verification and staff budget approval.
 
-## Current Scope
+## Features
 
-- Citizen-facing upload page
-- Image evidence upload
-- Description and location input
-- Dummy AI triage preview (emergency, hazard, blockade potential)
+- Citizen upload page with image evidence, issue details, and Google Maps incident pinning
+- Auto pin using current location with latitude and longitude capture
+- Dummy AI triage output for urgency, hazard type, route impact, and suggested budget
+- Staff dashboard for total budget overview, AI proposed allocations, and approval actions
 
-## Development
+## Environment Setup
 
-Run the app locally:
+Create or update `.env.local`:
 
 ```bash
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY_HERE
+```
+
+Enable these APIs in Google Cloud for the key:
+
+- Maps JavaScript API
+- Geolocation API (browser-side location permission still required)
+
+## Run Locally
+
+```bash
+npm install
 npm run dev
 ```
 
-Build for production:
+Open http://localhost:3000
 
-```bash
-npm run build
-```
+## Main Routes
 
-Run lint checks:
-
-```bash
-npm run lint
-```
+- `/` - GridGuard upload intake page
+- `/dashboard/staff` - GridGuard staff budget approval dashboard

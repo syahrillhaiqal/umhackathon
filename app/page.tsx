@@ -1,23 +1,26 @@
+import { TopNav } from "@/components/layout/top-nav";
 import { UploadIssueForm } from "@/components/report/upload-issue-form";
 
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col px-4 py-8 sm:px-6 lg:px-10">
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 rounded-3xl border border-white/70 bg-white/75 p-5 shadow-[0_24px_65px_rgba(17,57,83,0.16)] backdrop-blur md:p-8">
-        <section className="animate-rise-in rounded-2xl border border-[#d8e7eb] bg-[linear-gradient(120deg,#e9fffb_0%,#fff7ea_70%)] p-6 md:p-8">
-          <p className="mb-3 inline-flex rounded-full border border-[#8cc9ce] bg-white/75 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#0d6f77] uppercase">
-            Public Issue Intake
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6">
+        <TopNav active="upload" />
+
+        <section className="animate-rise-in rounded-2xl border border-[#314766] bg-[linear-gradient(120deg,#18293f_0%,#1d2f49_58%,#17263a_100%)] p-6 shadow-[0_16px_36px_rgba(4,12,26,0.35)] md:p-8">
+          <p className="mb-3 inline-flex rounded-full border border-[#446186] bg-[#112039] px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#aac1df] uppercase">
+            GridGuard Intake
           </p>
-          <h1 className="max-w-3xl text-3xl leading-tight font-semibold text-[#0f2435] md:text-5xl">
-            Verify high-risk traffic incidents with AI-assisted triage.
+          <h1 className="max-w-3xl text-3xl leading-tight font-semibold text-[#e8f0fb] md:text-5xl">
+            GridGuard traffic incident upload and AI verification.
           </h1>
-          <p className="mt-4 max-w-3xl text-sm leading-7 text-[#345066] md:text-base">
-            Upload a photo and field details so PBT, Majlis Daerah, and JKR teams can validate urgency, road blockage potential, and public hazard level.
+          <p className="mt-4 max-w-3xl text-sm leading-7 text-[#9ab0ca] md:text-base">
+            Submit an image and field context so PBT, Majlis Daerah, and JKR teams can verify emergency severity, road blockade risk, and funding decisions.
           </p>
-          <div className="mt-5 grid gap-3 text-sm text-[#355268] md:grid-cols-3">
-            <p className="rounded-xl border border-[#c9d8e4] bg-white px-4 py-3">1. Add photo evidence</p>
-            <p className="rounded-xl border border-[#c9d8e4] bg-white px-4 py-3">2. Describe issue context</p>
-            <p className="rounded-xl border border-[#c9d8e4] bg-white px-4 py-3">3. Receive AI triage preview</p>
+          <div className="mt-5 grid gap-3 text-sm text-[#b5c8df] md:grid-cols-3">
+            <p className="rounded-xl border border-[#334b6d] bg-[#15273d] px-4 py-3">1. Upload field image evidence</p>
+            <p className="rounded-xl border border-[#334b6d] bg-[#15273d] px-4 py-3">2. Pin map location and add details</p>
+            <p className="rounded-xl border border-[#334b6d] bg-[#15273d] px-4 py-3">3. Review AI risk and budget proposal</p>
           </div>
         </section>
 
