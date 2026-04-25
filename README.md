@@ -22,7 +22,20 @@ Enable these APIs in Google Cloud for the key:
 - Maps JavaScript API
 - Geolocation API (browser-side location permission still required)
 
-## Run Locally
+## PRESENTATION LINK
+https://drive.google.com/file/d/1lY43vafSkuWUtsAITNqnnuCyZCS5Fp8F/view?usp=sharing
+
+## Run Backend Locally 
+Activate venv (if you have .venv there)
+..venv\Scripts\Activate.ps1
+
+Install if needed
+pip install -r requirements.txt
+
+Start FastAPI
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+## Run Frontend Locally 
 
 ```bash
 npm install
