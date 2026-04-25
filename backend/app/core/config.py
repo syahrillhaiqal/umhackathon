@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, validation_alias=AliasChoices("GRIDGUARD_DEBUG", "DEBUG"))
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
+    cors_origins: str = Field(
+        default="http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174",
+        alias="CORS_ORIGINS",
+    )
 
     @field_validator("debug", mode="before")
     @classmethod
@@ -29,9 +33,10 @@ class Settings(BaseSettings):
             return True
         return True
 
-    glm_api_key: str = Field(default="", alias="GLM_API_KEY")
-    glm_base_url: str = Field(default="https://open.bigmodel.cn/api/paas/v4/", alias="GLM_BASE_URL")
-    glm_model: str = Field(default="glm-5.1", alias="GLM_MODEL")
+    # Ilmu YTL AI Labs API (primary decision engine & vision)
+    ilmu_api_key: str = Field(default="", alias="ILMU_API_KEY")
+    ilmu_base_url: str = Field(default="https://api.illmulabs.com/v1/chat/completions", alias="ILMU_BASE_URL")
+    ilmu_model: str = Field(default="ilmu-vision-1", alias="ILMU_MODEL")
 
     duckdb_path: str = Field(default="./data/gridguard.duckdb", alias="DUCKDB_PATH")
     postgres_dsn: str = Field(

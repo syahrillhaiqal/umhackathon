@@ -4,6 +4,8 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.redis import AsyncRedisSaver
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -23,6 +25,7 @@ class WorkflowService:
         self._audit_repo = AuditRepository(settings.postgres_dsn)
         self._event_broker = EventBroker()
         self._workflow_graph: WorkflowGraph | None = None
+        self._checkpointer_cm: AsyncIterator[AsyncRedisSaver] | None = None
 
     async def initialize(self) -> None:
         self._budget_repo.initialize()
@@ -33,12 +36,25 @@ class WorkflowService:
             audit_repo=self._audit_repo,
             event_broker=self._event_broker,
         )
-        self._workflow_graph = WorkflowGraph(nodes=nodes, redis_url=settings.redis_url)
+        checkpointer: Any
+        try:
+            self._checkpointer_cm = AsyncRedisSaver.from_conn_string(settings.redis_url)
+            checkpointer = await self._checkpointer_cm.__aenter__()
+        except Exception as exc:
+            # Redis Stack commands (FT.*) may be unavailable on plain Redis.
+            # Fall back to in-memory checkpointing to keep incident flow running.
+            print(f"[workflow] Redis checkpoint unavailable; falling back to MemorySaver: {exc}")
+            self._checkpointer_cm = None
+            checkpointer = MemorySaver()
+
+        self._workflow_graph = WorkflowGraph(nodes=nodes, checkpointer=checkpointer)
 
     async def shutdown(self) -> None:
         if self._workflow_graph is not None:
-            self._workflow_graph.close()
             self._workflow_graph = None
+        if self._checkpointer_cm is not None:
+            await self._checkpointer_cm.__aexit__(None, None, None)
+        self._checkpointer_cm = None
 
     async def process_incident(self, payload: IncidentCreate) -> dict[str, Any]:
         incident = Incident(**payload.model_dump())

@@ -7,6 +7,7 @@ from app.core.enums import HazardCategory, ReasoningDecisionType, ResolutionStat
 from app.models.budget import BudgetState
 from app.models.contractor import Contractor, ContractorAttempt
 from app.models.incident import Incident
+from app.models.vision_output import VisionOutput
 
 
 class ToolAction(BaseModel):
@@ -50,6 +51,8 @@ class WorkflowState(BaseModel):
 
 class WorkflowGraphState(TypedDict):
     incident: Incident
+    image_url: NotRequired[str]
+    vision_output: NotRequired[VisionOutput]
     hazard_category: NotRequired[HazardCategory]
     risk_level: NotRequired[RiskLevel]
     required_amount: NotRequired[float]
@@ -67,6 +70,7 @@ class WorkflowGraphState(TypedDict):
 def build_initial_state(incident: Incident) -> WorkflowGraphState:
     return {
         "incident": incident,
+        "image_url": incident.image_url,
         "decision_trace": [],
         "tool_calls": [],
         "contractor_attempts": [],

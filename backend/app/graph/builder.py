@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-from langgraph.checkpoint.redis import RedisSaver
 from langgraph.graph import END, START, StateGraph
 
 from app.core.enums import ReasoningDecisionType, ResolutionStatus
@@ -28,29 +27,21 @@ def _route_from_logistics(state: WorkflowGraphState) -> Literal["end"]:
 
 
 class WorkflowGraph:
-    def __init__(self, nodes: WorkflowNodes, redis_url: str) -> None:
+    def __init__(self, nodes: WorkflowNodes, checkpointer=None) -> None:
         self._nodes = nodes
-        self._redis_url = redis_url
-        # RedisSaver.from_conn_string returns a context manager in newer
-        # langgraph versions; we must enter it to get a BaseCheckpointSaver.
-        self._checkpointer_cm = RedisSaver.from_conn_string(redis_url)
-        self._checkpointer = self._checkpointer_cm.__enter__()
+        self._checkpointer = checkpointer
         self._graph = self._build()
-
-    def close(self) -> None:
-        cm = getattr(self, "_checkpointer_cm", None)
-        if cm is not None:
-            cm.__exit__(None, None, None)
-            self._checkpointer_cm = None
 
     def _build(self):
         graph_builder = StateGraph(WorkflowGraphState)
+        graph_builder.add_node("vision_preprocessing", self._nodes.vision_preprocessing_node)
         graph_builder.add_node("triage", self._nodes.triage_node)
         graph_builder.add_node("financial_check", self._nodes.financial_check_node)
         graph_builder.add_node("reasoning", self._nodes.reasoning_node)
         graph_builder.add_node("logistics_dispatch", self._nodes.logistics_dispatch_node)
 
-        graph_builder.add_edge(START, "triage")
+        graph_builder.add_edge(START, "vision_preprocessing")
+        graph_builder.add_edge("vision_preprocessing", "triage")
         graph_builder.add_edge("triage", "financial_check")
         graph_builder.add_edge("financial_check", "reasoning")
         graph_builder.add_conditional_edges(

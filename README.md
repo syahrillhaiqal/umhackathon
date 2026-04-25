@@ -14,7 +14,7 @@ This MVP demonstrates:
 
 - Backend: FastAPI (Python 3.12)
 - Workflow Engine: LangGraph
-- LLM: GLM-5.1 (through OpenAI-compatible endpoint)
+- LLM: Ilmu Vision-1 (YTL AI Labs, through OpenAI-compatible endpoint)
 - Operational DB: DuckDB
 - Audit DB: PostgreSQL
 - Checkpoint State: Redis
@@ -29,7 +29,7 @@ This MVP demonstrates:
 │   │   ├── api/                 # FastAPI routes
 │   │   ├── core/                # settings/enums
 │   │   ├── db/                  # DuckDB + PostgreSQL repositories
-│   │   ├── graph/               # LangGraph builder, nodes, GLM decision engine
+│   │   ├── graph/               # LangGraph builder, nodes, Ilmu decision engine
 │   │   ├── models/              # Pydantic models + workflow state
 │   │   ├── services/            # workflow orchestration + SSE event broker
 │   │   └── tools/               # mock tool interfaces
@@ -105,14 +105,14 @@ When `remaining_budget == 0` and `risk_level in [HIGH, CRITICAL]`, reasoning sel
 - Continues until contractor found or retries exhausted
 - On exhaustion, escalates to `HUMAN_ESCALATION` (never silent failure)
 
-## Why LangGraph + GLM (Instead of Hardcoded Logic)
+## Why LangGraph + Ilmu (Instead of Hardcoded Logic)
 
 Hardcoded branching locks behavior to static rules and does not adapt cleanly across mixed constraints.
 
 GridGuard uses:
 
 - LangGraph for explicit state machine control and cyclic execution
-- GLM-driven decision node for structured, tool-aware policy selection
+- Ilmu-driven decision node for structured, tool-aware policy selection
 - Deterministic JSON outputs that are auditable and replayable
 
 Result: dynamic decisioning with deterministic orchestration.
@@ -152,8 +152,8 @@ Services:
 
 Environment:
 
-- Set `GLM_API_KEY` in shell before `docker compose up` if using live GLM decisions.
-- Without `GLM_API_KEY`, reasoning falls back to deterministic policy logic using the same structured schema.
+- Set `ILMU_API_KEY` in shell before `docker compose up` for live decision engine.
+- Without `ILMU_API_KEY`, reasoning falls back to deterministic policy logic using the same structured schema.
 
 ## Local Development
 
