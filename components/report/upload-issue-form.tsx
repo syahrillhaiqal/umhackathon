@@ -4,7 +4,6 @@ import { FormEvent, useMemo, useState } from "react";
 import Image from "next/image";
 import { IncidentCoordinates, IncidentMapPicker } from "@/components/maps/incident-map-picker";
 import { generateDummyTriage, TriageResult } from "@/lib/ai-triage";
-import { addIncidentReport } from "@/lib/report-store";
 
 const levelStyles: Record<TriageResult["level"], string> = {
   Emergency: "border-[#7c4f58] bg-[#3a2530] text-[#f2c3cf]",
@@ -13,12 +12,39 @@ const levelStyles: Record<TriageResult["level"], string> = {
 };
 
 interface UploadState {
+  title: string;
   description: string;
   imageFile: File | null;
 }
 
+interface IncidentApiResponse {
+  incident?: {
+    incident_id?: string;
+  };
+  resolution_status?: string;
+  risk_level?: string;
+  hazard_category?: string;
+  required_amount?: number;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Unable to read selected image."));
+    };
+    reader.onerror = () => reject(new Error("Failed to read selected image."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function UploadIssueForm() {
   const [form, setForm] = useState<UploadState>({
+    title: "",
     description: "",
     imageFile: null,
   });
@@ -28,8 +54,14 @@ export function UploadIssueForm() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [result, setResult] = useState<TriageResult | null>(null);
   const [savedIncidentId, setSavedIncidentId] = useState<string>("");
+  const [submitError, setSubmitError] = useState<string>("");
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [apiResult, setApiResult] = useState<IncidentApiResponse | null>(null);
 
-  const canSubmit = useMemo(() => Boolean(form.description.trim() && coordinates), [coordinates, form.description]);
+  const canSubmit = useMemo(
+    () => Boolean(form.title.trim() && form.description.trim() && coordinates && !submitting),
+    [coordinates, form.description, form.title, submitting],
+  );
 
   const imageLabel = form.imageFile ? form.imageFile.name : "Click to upload issue photo";
 
@@ -51,12 +83,17 @@ export function UploadIssueForm() {
     reader.readAsDataURL(file);
   };
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!coordinates) {
       return;
     }
+
+    setSubmitError("");
+    setSavedIncidentId("");
+    setApiResult(null);
+    setSubmitting(true);
 
     const locationForAi = locationLabel || `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`;
 
@@ -70,15 +107,44 @@ export function UploadIssueForm() {
 
     setResult(triage);
 
-    const createdIncident = addIncidentReport({
-      locationText: locationForAi,
-      description: form.description,
-      latitude: coordinates.lat,
-      longitude: coordinates.lng,
-      triage,
-    });
+    try {
+      const imageData = form.imageFile ? await readFileAsDataUrl(form.imageFile) : undefined;
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+      const response = await fetch(`${apiBaseUrl}/api/incidents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          location: locationForAi,
+          image_url: imageData,
+        }),
+      });
 
-    setSavedIncidentId(createdIncident.id);
+      const responseBody = (await response.json()) as IncidentApiResponse | { detail?: string };
+
+      if (!response.ok) {
+        const detail =
+          typeof responseBody === "object" && responseBody && "detail" in responseBody
+            ? String(responseBody.detail)
+            : "Incident submission failed.";
+        throw new Error(detail);
+      }
+
+      const incidentId = responseBody.incident?.incident_id;
+      if (!incidentId) {
+        throw new Error("Incident created but incident ID is missing in response.");
+      }
+
+      setApiResult(responseBody);
+      setSavedIncidentId(incidentId);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Unable to submit incident.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -126,6 +192,19 @@ export function UploadIssueForm() {
           </div>
 
           <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-[#d9e4f5]">Incident Title</span>
+            <input
+              value={form.title}
+              onChange={(event) => {
+                setForm((prev) => ({ ...prev, title: event.target.value }));
+                setResult(null);
+              }}
+              className="rounded-xl border border-[#405a7e] bg-[#17273c] px-3 py-2 text-sm text-[#dbe7f8] outline-none ring-[#5977a5] placeholder:text-[#7f97b7] focus:ring-2"
+              placeholder="Short title for this incident"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-[#d9e4f5]">Issue Description</span>
             <textarea
               value={form.description}
@@ -144,12 +223,18 @@ export function UploadIssueForm() {
             disabled={!canSubmit}
             className="h-11 w-full rounded-xl bg-[#4f6f9b] text-sm font-semibold text-[#eef4fd] transition hover:bg-[#5b7cae] disabled:cursor-not-allowed disabled:bg-[#60799d]"
           >
-            Allocate Budget
+            {submitting ? "Submitting incident..." : "Allocate Budget"}
           </button>
 
           {savedIncidentId ? (
             <p className="rounded-lg border border-[#3a5a4d] bg-[#1f3a33] px-3 py-2 text-xs text-[#b4e5d6]">
-              Incident saved as {savedIncidentId}. Staff can review budget in dashboard.
+              Incident submitted to backend as {savedIncidentId}.
+            </p>
+          ) : null}
+
+          {submitError ? (
+            <p className="rounded-lg border border-[#6b4e64] bg-[#2a1c2a] px-3 py-2 text-xs text-[#efbfd8]">
+              {submitError}
             </p>
           ) : null}
         </div>
@@ -199,6 +284,27 @@ export function UploadIssueForm() {
             <p className="rounded-xl bg-[#1a2b41] p-3 text-[#c6d8ee]">
               <span className="font-semibold text-[#e0ebf9]">AI suggested budget:</span> MYR {result.aiSuggestedBudget.toLocaleString("en-MY")}
             </p>
+            {apiResult ? (
+              <div className="rounded-xl border border-[#334a6a] bg-[#121d2d] p-3 text-[#c9dbf2]">
+                <p>
+                  <span className="font-semibold text-[#e0ebf9]">Backend status:</span>{" "}
+                  {apiResult.resolution_status ?? "UNKNOWN"}
+                </p>
+                <p>
+                  <span className="font-semibold text-[#e0ebf9]">Risk level:</span> {apiResult.risk_level ?? "N/A"}
+                </p>
+                <p>
+                  <span className="font-semibold text-[#e0ebf9]">Hazard category:</span>{" "}
+                  {apiResult.hazard_category ?? "N/A"}
+                </p>
+                <p>
+                  <span className="font-semibold text-[#e0ebf9]">Required amount:</span>{" "}
+                  {typeof apiResult.required_amount === "number"
+                    ? `MYR ${apiResult.required_amount.toLocaleString("en-MY")}`
+                    : "N/A"}
+                </p>
+              </div>
+            ) : null}
             <p className="rounded-xl border border-[#334a6a] bg-[#121d2d] p-3 text-[#c9dbf2]">{result.recommendation}</p>
           </div>
         ) : (

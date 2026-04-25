@@ -10,6 +10,7 @@ class IncidentCreate(BaseModel):
     title: str = Field(min_length=3, max_length=180)
     description: str = Field(min_length=10, max_length=2000)
     location: str = Field(min_length=3, max_length=180)
+    image_url: str | None = Field(default=None, description="Image URL or base64-encoded image")
     media_url: str | None = None
 
 

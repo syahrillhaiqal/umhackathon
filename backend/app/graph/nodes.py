@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from pydantic import BaseModel
@@ -8,12 +9,16 @@ from app.core.config import Settings
 from app.core.enums import HazardCategory, ReasoningDecisionType, ResolutionStatus, RiskLevel
 from app.db.duckdb_client import BudgetRepository
 from app.db.postgres_audit import AuditRepository
-from app.graph.llm import GLMDecisionEngine
+from app.graph.llm import IlmuDecisionEngine
 from app.models.contractor import ContractorAttempt
 from app.models.state import DecisionTraceItem, ToolCallRecord, WorkflowGraphState
+from app.models.vision_output import VisionOutput
 from app.services.event_broker import EventBroker
+from app.services.vision_service import IlmuVisionService
 from app.tools.budget_tools import check_budget, execute_fund_transfer
 from app.tools.contractor_tools import find_contractors
+
+logger = logging.getLogger(__name__)
 
 
 class WorkflowNodes:
@@ -28,20 +33,90 @@ class WorkflowNodes:
         self._budget_repo = budget_repo
         self._audit_repo = audit_repo
         self._event_broker = event_broker
-        self._decision_engine = GLMDecisionEngine(settings)
+        self._decision_engine = IlmuDecisionEngine(settings)
+        self._vision_service = IlmuVisionService(settings)
+
+    async def vision_preprocessing_node(self, state: WorkflowGraphState) -> WorkflowGraphState:
+        """Preprocess image into structured incident data using multimodal vision API.
+        
+        This node:
+        1. Takes an optional image URL or base64 image
+        2. Calls Ilmu multimodal API to analyze the image
+        3. Extracts structured incident information
+        4. Stores vision output in state for downstream nodes
+        
+        If no image or API fails, skips preprocessing and continues with text-only flow.
+        
+        Args:
+            state: Current workflow state
+            
+        Returns:
+            Updated state with vision_output populated (if successful)
+        """
+        incident = state["incident"]
+        image_url = state.get("image_url")
+
+        # Skip vision preprocessing if no image provided
+        if not image_url:
+            summary = "No image provided. Skipping vision preprocessing."
+            state["decision_trace"].append(DecisionTraceItem(node="Vision_Preprocessing", summary=summary))
+            return state
+
+        # Call Ilmu API to analyze image
+        vision_output = await self._vision_service.analyze_image(
+            image_input=image_url,
+            title=incident.title,
+            description=incident.description,
+        )
+
+        if vision_output is None:
+            summary = "Image analysis failed or API unavailable. Continuing with text-only incident."
+            state["decision_trace"].append(DecisionTraceItem(node="Vision_Preprocessing", summary=summary))
+            return state
+
+        # Store vision output in state
+        state["vision_output"] = vision_output
+        
+        summary = (
+            f"Image analyzed. Category hint: {vision_output.hazard_category_hint}, "
+            f"Risk hint: {vision_output.risk_level_hint}, "
+            f"Confidence: {vision_output.confidence_score:.2f}"
+        )
+        state["decision_trace"].append(DecisionTraceItem(node="Vision_Preprocessing", summary=summary))
+        
+        logger.info(f"[{incident.incident_id}] Vision preprocessing complete: {summary}")
+        await self._record_event(state, "Vision_Preprocessing", summary, None)
+        
+        return state
 
     async def triage_node(self, state: WorkflowGraphState) -> WorkflowGraphState:
         incident = state["incident"]
-        text = f"{incident.title} {incident.description}".lower()
+        vision_output = state.get("vision_output")
 
-        category = self._classify_hazard(text)
-        risk_level = self._classify_risk(text)
+        # Combine vision and text inputs for classification
+        text_parts = [incident.title, incident.description]
+        
+        if vision_output:
+            text_parts.insert(0, vision_output.generated_title)
+            text_parts.insert(1, vision_output.generated_description)
+            text_parts.extend(vision_output.detected_objects)
+        
+        combined_text = " ".join(text_parts).lower()
+
+        # Use vision hints if available, otherwise classify from text
+        if vision_output:
+            category = self._map_category_hint(vision_output.hazard_category_hint)
+            risk_level = self._map_risk_hint(vision_output.risk_level_hint)
+        else:
+            category = self._classify_hazard(combined_text)
+            risk_level = self._classify_risk(combined_text)
 
         state["hazard_category"] = category
         state["risk_level"] = risk_level
         state["resolution_status"] = ResolutionStatus.IN_PROGRESS
 
-        summary = f"Incident triaged as {category.value} with {risk_level.value} risk."
+        confidence_str = f" (vision confidence: {vision_output.confidence_score:.2f})" if vision_output else ""
+        summary = f"Incident triaged as {category.value} with {risk_level.value} risk.{confidence_str}"
         state["decision_trace"].append(DecisionTraceItem(node="Triage", summary=summary))
         await self._record_event(state, "Triage", summary, None)
         return state
@@ -120,6 +195,30 @@ class WorkflowNodes:
             state["resolution_status"] = ResolutionStatus.HUMAN_ESCALATION
             state["escalation_reason"] = state["reasoning_output"].reason
 
+        requires_admin_approval = False
+        approval_reasons: list[str] = []
+        if risk_level == RiskLevel.CRITICAL:
+            requires_admin_approval = True
+            approval_reasons.append("Risk level is CRITICAL")
+
+        if decision.decision == ReasoningDecisionType.TRANSFER_FUNDS:
+            transfer_amount = float(decision.action.params.get("amount", self._settings.fund_transfer_increment))
+            if transfer_amount > self._settings.admin_transfer_approval_threshold:
+                requires_admin_approval = True
+                approval_reasons.append(
+                    f"Transfer amount {transfer_amount:.2f} exceeds threshold {self._settings.admin_transfer_approval_threshold:.2f}"
+                )
+
+        if requires_admin_approval and not state.get("admin_approved", False):
+            state["resolution_status"] = ResolutionStatus.AWAITING_ADMIN_APPROVAL
+            state["escalation_reason"] = "; ".join(approval_reasons)
+            summary = f"Admin approval required before auto-action: {'; '.join(approval_reasons)}"
+            state["decision_trace"].append(
+                DecisionTraceItem(node="Admin_Guardrail", summary=summary, decision="AWAITING_ADMIN_APPROVAL")
+            )
+            await self._record_event(state, "Admin_Guardrail", summary, "AWAITING_ADMIN_APPROVAL")
+            return state
+
         await self._record_event(
             state,
             "Reasoning",
@@ -144,10 +243,13 @@ class WorkflowNodes:
         state["candidate_contractors"] = candidates
 
         selected = None
+        unavailable_count = 0
         for candidate in candidates[: self._settings.contractor_retry_limit]:
             if candidate.available:
                 selected = candidate
                 break
+
+            unavailable_count += 1
             state["contractor_attempts"].append(
                 ContractorAttempt(
                     contractor_id=candidate.contractor_id,
@@ -155,6 +257,22 @@ class WorkflowNodes:
                     reason="Contractor unavailable. Retrying next closest provider.",
                 )
             )
+
+            if unavailable_count >= self._settings.contractor_unavailable_alert_threshold:
+                state["resolution_status"] = ResolutionStatus.HUMAN_ESCALATION
+                state["escalation_reason"] = (
+                    f"Auto-escalated after {unavailable_count} unavailable contractor attempts."
+                )
+                summary = (
+                    f"Auto-escalation alert: contractor unavailable {unavailable_count} times. "
+                    "Human supervisor intervention required."
+                )
+                decision = "ESCALATE"
+                state["decision_trace"].append(
+                    DecisionTraceItem(node="Logistics_Dispatch", summary=summary, decision=decision)
+                )
+                await self._record_event(state, "Logistics_Dispatch", summary, decision)
+                return state
 
         state["tool_calls"].append(
             ToolCallRecord(
@@ -190,6 +308,49 @@ class WorkflowNodes:
         return 5000.0
 
     @staticmethod
+    def _map_category_hint(hint: str) -> HazardCategory:
+        """Map vision model's category hint to HazardCategory enum.
+        
+        Args:
+            hint: Category hint from vision model (e.g., "ROAD_PAVEMENT", "UTILITY_POWER")
+            
+        Returns:
+            Mapped HazardCategory, or ROAD_PAVEMENT as fallback
+        """
+        hint_upper = hint.upper().strip()
+        
+        category_map = {
+            "ROAD_PAVEMENT": HazardCategory.ROAD_PAVEMENT,
+            "UTILITY_POWER": HazardCategory.UTILITY_POWER,
+            "WATER_SEWAGE": HazardCategory.WATER_SEWAGE,
+            "VEGETATION": HazardCategory.VEGETATION,
+            "LIGHTING": HazardCategory.LIGHTING,
+        }
+        
+        return category_map.get(hint_upper, HazardCategory.ROAD_PAVEMENT)
+
+    @staticmethod
+    def _map_risk_hint(hint: str) -> RiskLevel:
+        """Map vision model's risk hint to RiskLevel enum.
+        
+        Args:
+            hint: Risk level hint from vision model (e.g., "LOW", "CRITICAL")
+            
+        Returns:
+            Mapped RiskLevel, or LOW as fallback
+        """
+        hint_upper = hint.upper().strip()
+        
+        risk_map = {
+            "LOW": RiskLevel.LOW,
+            "MEDIUM": RiskLevel.MEDIUM,
+            "HIGH": RiskLevel.HIGH,
+            "CRITICAL": RiskLevel.CRITICAL,
+        }
+        
+        return risk_map.get(hint_upper, RiskLevel.LOW)
+
+    @staticmethod
     def _classify_hazard(text: str) -> HazardCategory:
         if any(token in text for token in ["blackout", "power", "electric", "voltage", "substation"]):
             return HazardCategory.UTILITY_POWER
@@ -214,14 +375,13 @@ class WorkflowNodes:
     async def _record_event(self, state: WorkflowGraphState, node: str, summary: str, decision: str | None) -> None:
         payload = self._serialize_state(state)
         incident_id = state["incident"].incident_id
-        if self._audit_repo is not None:
-            await self._audit_repo.record(
-                incident_id=incident_id,
-                node_name=node,
-                summary=summary,
-                decision=decision,
-                payload=payload,
-            )
+        await self._audit_repo.record(
+            incident_id=incident_id,
+            node_name=node,
+            summary=summary,
+            decision=decision,
+            payload=payload,
+        )
         await self._event_broker.publish(
             {
                 "incident_id": incident_id,

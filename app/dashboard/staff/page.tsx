@@ -12,10 +12,10 @@ export default function StaffDashboardPage() {
             GridGuard Staff Console
           </p>
           <h1 className="max-w-3xl text-3xl leading-tight font-semibold text-[#e8f0fb] md:text-5xl">
-            Budget governance for AI-proposed incident responses.
+            Admin control room for AI incident workflow governance.
           </h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-[#9ab0ca] md:text-base">
-            View total operating funds, review allocations proposed from uploaded incident triage, and approve each budget release.
+            Monitor guardrail stops, inspect per-incident decision traces, and approve or reject autonomous actions with full audit history.
           </p>
         </section>
 

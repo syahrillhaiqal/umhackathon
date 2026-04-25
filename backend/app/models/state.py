@@ -7,6 +7,7 @@ from app.core.enums import HazardCategory, ReasoningDecisionType, ResolutionStat
 from app.models.budget import BudgetState
 from app.models.contractor import Contractor, ContractorAttempt
 from app.models.incident import Incident
+from app.models.vision_output import VisionOutput
 
 
 class ToolAction(BaseModel):
@@ -44,12 +45,16 @@ class WorkflowState(BaseModel):
     contractor_attempts: list[ContractorAttempt] = Field(default_factory=list)
     candidate_contractors: list[Contractor] = Field(default_factory=list)
     selected_contractor: Contractor | None = None
+    admin_approved: bool = False
+    admin_review_note: str | None = None
     resolution_status: ResolutionStatus = ResolutionStatus.PENDING
     escalation_reason: str | None = None
 
 
 class WorkflowGraphState(TypedDict):
     incident: Incident
+    image_url: NotRequired[str]
+    vision_output: NotRequired[VisionOutput]
     hazard_category: NotRequired[HazardCategory]
     risk_level: NotRequired[RiskLevel]
     required_amount: NotRequired[float]
@@ -60,6 +65,8 @@ class WorkflowGraphState(TypedDict):
     contractor_attempts: list[ContractorAttempt]
     candidate_contractors: list[Contractor]
     selected_contractor: NotRequired[Contractor | None]
+    admin_approved: NotRequired[bool]
+    admin_review_note: NotRequired[str | None]
     resolution_status: ResolutionStatus
     escalation_reason: NotRequired[str | None]
 
@@ -67,11 +74,14 @@ class WorkflowGraphState(TypedDict):
 def build_initial_state(incident: Incident) -> WorkflowGraphState:
     return {
         "incident": incident,
+        "image_url": incident.image_url,
         "decision_trace": [],
         "tool_calls": [],
         "contractor_attempts": [],
         "candidate_contractors": [],
         "selected_contractor": None,
+        "admin_approved": False,
+        "admin_review_note": None,
         "resolution_status": ResolutionStatus.PENDING,
         "escalation_reason": None,
     }

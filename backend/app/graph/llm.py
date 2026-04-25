@@ -19,15 +19,22 @@ class LLMDecisionEnvelope(BaseModel):
     next_action: dict[str, Any] = Field(default_factory=dict)
 
 
-class GLMDecisionEngine:
+class IlmuDecisionEngine:
+    """Decision engine using Ilmu YTL AI Labs API.
+    
+    Uses Ilmu multimodal model for structured reasoning about
+    budget transfers, contractor dispatch, and escalation decisions.
+    Falls back to deterministic logic if API unavailable.
+    """
+
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._client: ChatOpenAI | None = None
-        if settings.glm_api_key:
+        if settings.ilmu_api_key:
             self._client = ChatOpenAI(
-                api_key=settings.glm_api_key,
-                base_url=settings.glm_base_url,
-                model=settings.glm_model,
+                api_key=settings.ilmu_api_key,
+                base_url=settings.ilmu_base_url,
+                model=settings.ilmu_model,
                 temperature=0,
             )
 
